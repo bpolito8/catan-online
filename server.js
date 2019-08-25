@@ -99,41 +99,41 @@ var spotToUserDict = {
 	'[1, 3]': null,
 	'[1, 4]': null,
 	'[1, 5]': null,
-		 
+		
 	'[3, 0]': null,
 	'[3, 1]': null,
 	'[3, 2]': null,
 	'[3, 3]': null,
 	'[3, 4]': null,
-		 
+		
 	'[5, 0]': null,
 	'[5, 1]': null,
 	'[5, 2]': null,
 	'[5, 3]': null,
-	     
+		
 	'[-1, 0]': 0,
 	'[-1, 1]': null,
 	'[-1, 2]': null,
 	'[-1, 3]': null,
 	'[-1, 4]': null,
 	'[-1, 5]': null,
-		   
+		
 	'[-3, 0]': null,
 	'[-3, 1]': 1,
 	'[-3, 2]': null,
 	'[-3, 3]': null,
 	'[-3, 4]': null,
-		 
+		
 	'[-5, 1]': null,
 	'[-5, 2]': null,
 	'[-5, 3]': null,
-		   
+		
 	'[-1, -1]': null,
 	'[-1, -2]': null,
 	'[-1, -3]': null,
 	'[-1, -4]': null,
 	'[-1, -5]': null,
-		   
+		
 
 	'[-3, -1]': null,
 	'[-3, -2]': null,
@@ -143,8 +143,8 @@ var spotToUserDict = {
 	'[-5, -1]': null,
 	'[-5, -2]': null,
 	'[-5, -3]': null,
-		  
-		  
+		
+		
 	'[1, -1]': null,
 	'[1, -2]': null,
 	'[1, -3]': null,
@@ -155,231 +155,401 @@ var spotToUserDict = {
 	'[3, -2]': null,
 	'[3, -3]': null,
 	'[3, -4]': null,
-		   
+		
 	'[5, -1]': null,
 	'[5, -2]': null,
-  '[5, -3]': null,
+'[5, -3]': null,
 
 
 };
-var minSessions = 2;
-var gameRunning = false;
 
 app.get('/', function (req, res) {
 	res.sendFile(__dirname + '/index.html');
 });
 
-io.on('connection', function (socket) {
-	socket.emit('serverMessage', "connection successful");
-	socket.emit("setUserId", players.length + 1, colors[players.length]);
-	console.log(colors[players.length]);
-	socket.on('message', function (data) {
-		console.log(data);
-		io.emit('message', data);//send to all clients
-	});
-	app.get('/api/buildRoad', function(req, res){
-		console.log(req.query);
-		players[req.query.playerId - 1].roads.push({
-			gridX: req.query.x,
-			gridY: req.query.y * -1
-		});
-		players[req.query.playerId - 1].resources.wood--;
-		players[req.query.playerId - 1].resources.clay--;
-		io.emit("post-turn", productiveSpots, players);
-	  });
-	app.get('/api/buildSettlement', function(req, res){
-		console.log(req.query);
-		players[req.query.playerId - 1].settlements.push({
-			gridX: req.query.x,
-			gridY: req.query.y * -1
-		});
-		players[req.query.playerId - 1].resources.wood--;
-		players[req.query.playerId - 1].resources.clay--;
-		players[req.query.playerId - 1].resources.wool--;
-		players[req.query.playerId - 1].resources.grain--;
-		io.emit("post-turn", productiveSpots, players);
-	  });
-	//var oi = io.listen(server);
-	//sessionIds.push(socket.id);
-	sockets.push(socket);
-	players.push({
-		num: players.length,
-		settlements: [
-			{
-				gridY: players.length,
-				gridX: 1 + (2 * players.length)
-			},
-			{
-				gridY: -1 * players.length,
-				gridX: -1 - (2 * players.length)
-			}
-		],
-		roads: [
-			{
-				gridY: players.length + 0.5,
-				gridX: 1 + (2 * players.length)
-			},
-			{
-				gridY: -1 * players.length + 0.5,
-				gridX: -1 - (2 * players.length)
-			}
-		],
-		devCards: {
-			used: [],
-			unused: []
-		},
-		resources: {
-			ore: 0,
-			clay: 1,
-			wool: 0,
-			wood: 1,
-			grain: 0,
-
-		},
-		strokeStyle: colors[players.length]
-	});
-
-	debugger;
-
-	// if(hexTiles.length > 0){
-	// 	socket.emit('board', hexTiles);
-	// }
-	if (players.length >= minSessions && !gameRunning) {
-		console.log(players.length + " players have joined, starting game");
-		game(socket);
-	}
-	
-
-
-
+app.get('/api/restartGame', function (req, res) {
+	console.log("restarting...")
+	startGame()
+	console.log("restarted")
 });
 
-async function game(socket) {
-	gameRunning = true;
+var startGame = function(){
+	var players = [];
+	var sockets = [];
+	var productiveSpots = []
+	var hexTiles = {};
+	var colors = [
+		"#3333ff",
+		"#ffffff",
+		"#339933",
+		"#cc3300"
+	]
+	var spots = [
+		[0, 1],
+		[1, 1],
+		[2, 1],
+		[3, 1],
+		[4, 1],
+		[5, 1],
 
-	//load board
-	hexTiles = loadBoard();
-	io.emit('initialboard', hexTiles);
-	io.emit('players', hexTiles);
-	console.log("Board data sent to clients");
+		[0, 3],
+		[1, 3],
+		[2, 3],
+		[3, 3],
+		[4, 3],
 
-	//process turns
-	while (gameRunning) {
-		for (var i = 0; i < players.length; i++) {
-			var playerNum = players[i].num + 1;
-			console.log("The current player is Player " + playerNum);
-			console.log(players.length)
-			io.emit('turnUpdate', (players[i].num + 1));
-			var turnOver = false;
+		[0, 5],
+		[1, 5],
+		[2, 5],
+		[3, 5],
 
 
-			runTurn(players[i]);
+		[0, -1],
+		[1, -1],
+		[2, -1],
+		[3, -1],
+		[4, -1],
+		[5, -1],
+
+		[0, -3],
+		[1, -3],
+		[2, -3],
+		[3, -3],
+		[4, -3],
+
+		[0, -5],
+		[1, -5],
+		[2, -5],
+		[3, -5],
 
 
-			sockets[i].on("endTurn", function (data) {
-				//console.log(data == i + 1);
-				//console.log(data + " " + i + 1);
-				if (data - 1 == i) {
-					turnOver = true;
-				}
-			}); //event listener, can be called on client to execute on server
+		[-0, -1],
+		[-1, -1],
+		[-2, -1],
+		[-3, -1],
+		[-4, -1],
+		[-5, -1],
+
+		[-0, -3],
+		[-1, -3],
+		[-2, -3],
+		[-3, -3],
+		[-4, -3],
+
+		[-0, -5],
+		[-1, -5],
+		[-2, -5],
+		[-3, -5],
+
+
+		[-0, 1],
+		[-1, 1],
+		[-2, 1],
+		[-3, 1],
+		[-4, 1],
+		[-5, 1],
+
+		[-0, 3],
+		[-1, 3],
+		[-2, 3],
+		[-3, 3],
+		[-4, 3],
+
+		[-0, 5],
+		[-1, 5],
+		[-2, 5],
+		[-3, 5]
+	]
+
+	var spotToUserDict = {
+		'[1, 0]': 0,
+		'[1, 1]': null,
+		'[1, 2]': null,
+		'[1, 3]': null,
+		'[1, 4]': null,
+		'[1, 5]': null,
 			
-			var q = 0;
-			while (!turnOver) {
-				q++;
-				await sleep(1000)
-			};
-			//console.log("Player " + players[i].num + " turn over in " + q + " seconds");
-		}
+		'[3, 0]': null,
+		'[3, 1]': null,
+		'[3, 2]': null,
+		'[3, 3]': null,
+		'[3, 4]': null,
+			
+		'[5, 0]': null,
+		'[5, 1]': null,
+		'[5, 2]': null,
+		'[5, 3]': null,
+			
+		'[-1, 0]': 0,
+		'[-1, 1]': null,
+		'[-1, 2]': null,
+		'[-1, 3]': null,
+		'[-1, 4]': null,
+		'[-1, 5]': null,
+			
+		'[-3, 0]': null,
+		'[-3, 1]': 1,
+		'[-3, 2]': null,
+		'[-3, 3]': null,
+		'[-3, 4]': null,
+			
+		'[-5, 1]': null,
+		'[-5, 2]': null,
+		'[-5, 3]': null,
+			
+		'[-1, -1]': null,
+		'[-1, -2]': null,
+		'[-1, -3]': null,
+		'[-1, -4]': null,
+		'[-1, -5]': null,
+			
 
-	}
-	socket.broadcast("serverMessage", "game over");
+		'[-3, -1]': null,
+		'[-3, -2]': null,
+		'[-3, -3]': null,
+		'[-3, -4]': null,
+
+		'[-5, -1]': null,
+		'[-5, -2]': null,
+		'[-5, -3]': null,
+			
+			
+		'[1, -1]': null,
+		'[1, -2]': null,
+		'[1, -3]': null,
+		'[1, -4]': null,
+		'[1, -5]': null,
+
+		'[3, -1]': 1,
+		'[3, -2]': null,
+		'[3, -3]': null,
+		'[3, -4]': null,
+			
+		'[5, -1]': null,
+		'[5, -2]': null,
+	'[5, -3]': null,
 
 
-}
+	};
+	var minSessions = 2;
+	var gameRunning = false;
 
-const sleep = (milliseconds) => {
-	return new Promise(resolve => setTimeout(resolve, milliseconds))
-}
-
-function runTurn(player) {
-	if (player.devCards.unused.length > 0) {
-		//TODO: prompt the user to see if they want to use dev cards
-	}
-	var diceRoll = rollDice();
-	var playerNum = player.num + 1;
-	io.emit("serverMessage", "Player " + playerNum + " rolled a " + diceRoll);
-	io.emit("diceRoll", diceRoll)
-	var xOffset = 1;
-	var yOffset = 1;
-	var xMax = 5;
-	var xMin = -5
-	var yMax = 5;
-	var yMin = -5;
-	productiveSpots = [];
-	if (diceRoll == 7) {
-		
-		//TODO: run robber stuff
-	} else {
-		console.log("tileCoords");
-		console.log(hexTiles[0].gridX);
-		
-		for (var i = 0; i < hexTiles.length; i++) {
-			//check if the tile has the appropriate number
-			if (hexTiles[i].number == diceRoll) {
-				
-				var y = hexTiles[i].gridY * -1;
-				var x = hexTiles[i].gridX;
-				productiveSpots.push([x, y]);
-				console.log("There is an " + diceRoll + " at [" + x + ", " + y + "]");
-				//check all six possible spots in relation to this tile
-				var spotsToCheck = [
-					[x + xOffset, y + yOffset],
-					[x + xOffset, y],
-					[x + xOffset, y - yOffset],
-					[x - xOffset, y - yOffset],
-					[x - xOffset, y + yOffset],
-					[x - xOffset, y],
-				];
-				//console.log(spotsToCheck);
-
-				var keys = [];
-				for(var h = 0; h < spotsToCheck.length; h++){
-					keys.push("[" + spotsToCheck[h][0] + ", " + spotsToCheck[h][1] + "]");
+	io.on('connection', function (socket) {
+		socket.emit('serverMessage', "connection successful");
+		socket.emit("setUserId", players.length + 1, colors[players.length]);
+		console.log(colors[players.length]);
+		socket.on('message', function (data) {
+			console.log(data);
+			io.emit('message', data);//send to all clients
+		});
+		app.get('/api/buildRoad', function(req, res){
+			console.log(req.query);
+			players[req.query.playerId - 1].roads.push({
+				gridX: req.query.x,
+				gridY: req.query.y * -1
+			});
+			players[req.query.playerId - 1].resources.wood--;
+			players[req.query.playerId - 1].resources.clay--;
+			io.emit("post-turn", productiveSpots, players);
+		  });
+		app.get('/api/buildSettlement', function(req, res){
+			console.log(req.query);
+			players[req.query.playerId - 1].settlements.push({
+				gridX: req.query.x,
+				gridY: req.query.y * -1
+			});
+			players[req.query.playerId - 1].resources.wood--;
+			players[req.query.playerId - 1].resources.clay--;
+			players[req.query.playerId - 1].resources.wool--;
+			players[req.query.playerId - 1].resources.grain--;
+			io.emit("post-turn", productiveSpots, players);
+		  });
+		//var oi = io.listen(server);
+		//sessionIds.push(socket.id);
+		sockets.push(socket);
+		players.push({
+			num: players.length,
+			settlements: [
+				{
+					gridY: players.length,
+					gridX: 1 + (2 * players.length)
+				},
+				{
+					gridY: -1 * players.length,
+					gridX: -1 - (2 * players.length)
 				}
-				
-				console.log(keys);
-				for (j in keys) {
-					var player = players[spotToUserDict[keys[j]]];
-					if(player){
-						player.resources[hexTiles[i].resourceType]++;
-					}
+			],
+			roads: [
+				{
+					gridY: players.length + 0.5,
+					gridX: 1 + (2 * players.length)
+				},
+				{
+					gridY: -1 * players.length + 0.5,
+					gridX: -1 - (2 * players.length)
 				}
-				// players[spotToUserDict["[" + hexTiles.gridX + ", " + hexTiles.gridY + yOffset + "]"]][hexTiles.resourceType]++;
-				// players[spotToUserDict["[" + hexTiles.gridX +  xOffset+ ", " + hexTiles.gridY + yOffset + "]"]][hexTiles.resourceType]++;
-				// players[spotToUserDict["[" + hexTiles.gridX + xOffset+ ", " + hexTiles.gridY - yOffset + "]"]][hexTiles.resourceType]++;
-				// players[spotToUserDict["[" + hexTiles.gridX+ ", " + hexTiles.gridY - yOffset + "]"]][hexTiles.resourceType]++;
-				// players[spotToUserDict["[" + hexTiles.gridX - xOffset+ ", " + hexTiles.gridY - yOffset + "]"]][hexTiles.resourceType]++;
-				// players[spotToUserDict["[" + hexTiles.gridX - xOffset+ ", " + hexTiles.gridY + yOffset + "]"]][hexTiles.resourceType]++;
-			}
+			],
+			devCards: {
+				used: [],
+				unused: []
+			},
+			resources: {
+				ore: 0,
+				clay: 1,
+				wool: 0,
+				wood: 1,
+				grain: 0,
+	
+			},
+			strokeStyle: colors[players.length]
+		});
+	
+		debugger;
+	
+		// if(hexTiles.length > 0){
+		// 	socket.emit('board', hexTiles);
+		// }
+		if (players.length >= minSessions && !gameRunning) {
+			console.log(players.length + " players have joined, starting game");
+			game(socket);
 		}
 		
-	}
-	io.emit("post-turn", productiveSpots, players);
-		console.log(players);
-}
-function rollDice() {
-	var dice1 = Math.floor((Math.random() * 6) + 1);
-	var dice2 = Math.floor((Math.random() * 6) + 1);
-	return dice1 + dice2;
-
-}
-function addSettlement(player, x, y){
-	player.settlements.push({
-		gridX: x,
-		gridY: y
+	
+	
+	
 	});
+	async function game(socket) {
+		gameRunning = true;
+	
+		//load board
+		hexTiles = loadBoard();
+		io.emit('initialboard', hexTiles);
+		io.emit('players', hexTiles);
+		console.log("Board data sent to clients");
+	
+		//process turns
+		while (gameRunning) {
+			for (var i = 0; i < players.length; i++) {
+				var playerNum = players[i].num + 1;
+				console.log("The current player is Player " + playerNum);
+				console.log(players.length)
+				io.emit('turnUpdate', (players[i].num + 1));
+				var turnOver = false;
+	
+	
+				runTurn(players[i]);
+	
+	
+				sockets[i].on("endTurn", function (data) {
+					//console.log(data == i + 1);
+					//console.log(data + " " + i + 1);
+					if (data - 1 == i) {
+						turnOver = true;
+					}
+				}); //event listener, can be called on client to execute on server
+				
+				var q = 0;
+				while (!turnOver) {
+					q++;
+					await sleep(1000)
+				};
+				//console.log("Player " + players[i].num + " turn over in " + q + " seconds");
+			}
+	
+		}
+		socket.broadcast("serverMessage", "game over");
+	
+	
+	}
+
+	const sleep = (milliseconds) => {
+		return new Promise(resolve => setTimeout(resolve, milliseconds))
+	}
+	
+	function runTurn(player) {
+		if (player.devCards.unused.length > 0) {
+			//TODO: prompt the user to see if they want to use dev cards
+		}
+		var diceRoll = rollDice();
+		var playerNum = player.num + 1;
+		io.emit("serverMessage", "Player " + playerNum + " rolled a " + diceRoll);
+		io.emit("diceRoll", diceRoll)
+		var xOffset = 1;
+		var yOffset = 1;
+		var xMax = 5;
+		var xMin = -5
+		var yMax = 5;
+		var yMin = -5;
+		productiveSpots = [];
+		if (diceRoll == 7) {
+			
+			//TODO: run robber stuff
+		} else {
+			console.log("tileCoords");
+		var gameRunning = false;
+			console.log(hexTiles[0].gridX);
+			
+			for (var i = 0; i < hexTiles.length; i++) {
+				//check if the tile has the appropriate number
+				if (hexTiles[i].number == diceRoll) {
+					
+					var y = hexTiles[i].gridY * -1;
+					var x = hexTiles[i].gridX;
+					productiveSpots.push([x, y]);
+					console.log("There is an " + diceRoll + " at [" + x + ", " + y + "]");
+					//check all six possible spots in relation to this tile
+					var spotsToCheck = [
+						[x + xOffset, y + yOffset],
+						[x + xOffset, y],
+						[x + xOffset, y - yOffset],
+						[x - xOffset, y - yOffset],
+						[x - xOffset, y + yOffset],
+						[x - xOffset, y],
+					];
+					//console.log(spotsToCheck);
+	
+					var keys = [];
+					for(var h = 0; h < spotsToCheck.length; h++){
+						keys.push("[" + spotsToCheck[h][0] + ", " + spotsToCheck[h][1] + "]");
+					}
+					
+					console.log(keys);
+					for (j in keys) {
+						var player = players[spotToUserDict[keys[j]]];
+						if(player){
+							player.resources[hexTiles[i].resourceType]++;
+						}
+					}
+					// players[spotToUserDict["[" + hexTiles.gridX + ", " + hexTiles.gridY + yOffset + "]"]][hexTiles.resourceType]++;
+					// players[spotToUserDict["[" + hexTiles.gridX +  xOffset+ ", " + hexTiles.gridY + yOffset + "]"]][hexTiles.resourceType]++;
+					// players[spotToUserDict["[" + hexTiles.gridX + xOffset+ ", " + hexTiles.gridY - yOffset + "]"]][hexTiles.resourceType]++;
+					// players[spotToUserDict["[" + hexTiles.gridX+ ", " + hexTiles.gridY - yOffset + "]"]][hexTiles.resourceType]++;
+					// players[spotToUserDict["[" + hexTiles.gridX - xOffset+ ", " + hexTiles.gridY - yOffset + "]"]][hexTiles.resourceType]++;
+					// players[spotToUserDict["[" + hexTiles.gridX - xOffset+ ", " + hexTiles.gridY + yOffset + "]"]][hexTiles.resourceType]++;
+				}
+			}
+			
+		}
+		io.emit("post-turn", productiveSpots, players);
+			console.log(players);
+	}
+	function rollDice() {
+		var dice1 = Math.floor((Math.random() * 6) + 1);
+		var dice2 = Math.floor((Math.random() * 6) + 1);
+		return dice1 + dice2;
+	
+	}
+	function addSettlement(player, x, y){
+		player.settlements.push({
+			gridX: x,
+			gridY: y
+		});
+	}
 }
+
+startGame()
+
+
 
 
 /*

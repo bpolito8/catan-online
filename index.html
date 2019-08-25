@@ -123,6 +123,9 @@
         $("#settlement").click(function () {
             buildSettlement();
         });
+        $("#restart").click(function () {
+            restartGame();
+        });
 
 
         socket.on('initialboard', function (data) {
@@ -599,6 +602,11 @@
                 //canvasCenterX + dx * road.gridX
             });
         }
+        function restartGame() {
+            $.get(baseUrl + '/api/restartGame', function (data) {
+                    console.log("game restarted")
+                });
+        }
         });
 </script>
 
@@ -610,6 +618,7 @@
     <br>
     <button id="settlement">settlement</button>
     <button id="road">road</button>
+    <button id="restart">RESTART</button>
     <label>roll:</label><span id="dice-roll"></span>
     <br>
     <br>
