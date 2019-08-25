@@ -167,6 +167,10 @@ app.get('/', function (req, res) {
 	res.sendFile(__dirname + '/index.html');
 });
 
+
+app.get('/test', function (req, res) {
+	res.send("hello world");
+});
 app.get('/api/restartGame', function (req, res) {
 	console.log("restarting...")
 	startGame()
