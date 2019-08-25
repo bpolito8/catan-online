@@ -2,7 +2,13 @@ var app = require('express')();
 var server = require('http').Server(app);
 var io = require('socket.io')(server);
 
-server.listen(8000);
+app.set( 'port', ( process.env.PORT || 8000 ));
+
+
+server.listen(app.get( 'port' ), function() {
+	console.log( 'Node server is running on port ' + app.get( 'port' ));
+	});
+	
 // WARNING: app.listen(80) will NOT work here!
 
 var players = [];
