@@ -1,0 +1,625 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.dev.js"></script>
+<script src="https://code.jquery.com/jquery-3.4.0.min.js" integrity="sha256-BJeo0qm959uMBGb65z40ejJYGSgR7REI4+CW1fNKwOg="
+    crossorigin="anonymous"></script>
+<script src="catan.js"></script>
+<link rel="stylesheet" href="css/stylesheet.css">
+<script>
+    var baseUrl = 'http://localhost:8000';
+    var mapStyle = "retro";
+
+    var size = null;
+    var defaultFillStyle = "#ffffff";
+    var strokeStyle = "#000000";
+    var lineWidth = 3;
+    var mapCanvas;
+    var drawingContext;
+    var productiveSpots = [];
+    var settlements = [];
+    var roads = [];
+    var players = [];
+    var userColor = null;
+
+    var canvasCenterX;
+    var canvasCenterY;
+    var resourceTypeToColor = {
+        "ore": "#363636",
+        "clay": "#E83200",
+        "wool": "#98E82E",
+        "wood": "#0A7300",
+        "grain": "#E0E000",
+        "desert": "#F2F0A0",
+        "none": "#ffffff"
+    };
+    var resourceTypeToImageCanvas = {
+        "ore": null,
+        "clay": null,
+        "wool": null,
+        "wood": null,
+        "grain": null,
+        "desert": null
+    };
+    function HexTile() {
+        this.gridX;
+        this.gridY;
+        this.xCenter;
+        this.yCenter;
+        this.resourceType = "none";
+        this.fillStyle = defaultFillStyle;
+        this.number;
+    }
+    var userId = -1;
+    var myTurn = false;
+    var hexTiles = null;
+    window.onresize = function (event) {
+        sizeCanvas();
+        resizeBoard();
+        drawBoard();
+    }
+    function sizeCanvas() {
+        var mapContainer = $("div#map-container")[0];
+        $(mapCanvas).attr("width", $(mapContainer).width());
+        $(mapCanvas).attr("height", $(mapContainer).height());
+        canvasCenterY = mapCanvas.height / 2;
+        canvasCenterX = mapCanvas.width / 2;
+    }
+    var socket = io.connect(baseUrl);
+    socket.on('news', function (data) {
+        console.log("recieved data from server");
+        socket.emit('my other event', { my: 'data' });
+    });
+    socket.on('serverMessage', function (data) {
+        console.log(data);
+    });
+    socket.on('message', function (data) {
+        console.log(data);
+    });
+    socket.on('setUserId', function (data, color) {
+        console.log("I am player " + data);
+        userId = data;
+        debugger;
+        var userColor = color;
+        $("#title").css('color', color);
+        $("#title").text("Player " + data);
+
+    });
+    socket.on('turnUpdate', function (data) {
+        if (data == userId) {
+            console.log("it is my turn");
+            $("#end-turn").show();
+        }
+        else {
+            hideAllButtons();
+            console.log("It is player " + data + "'s turn");
+        }
+
+
+        myTurn = true;
+    });
+    function hideAllButtons(){
+        $("#end-turn").hide();
+        $("#road").hide();
+                $("#settlement").hide();
+    }
+    socket.on("diceRoll", function (data) {
+        $("#dice-roll").text(data);
+    });
+    // socket.on('players', function (data) {
+    //     var players = data;
+    // });
+
+    $(document).ready(function () {
+
+        $("#send").click(function () {
+            socket.emit('message', { text: $("#text").val() });
+        });
+        $("#end-turn").click(function () {
+            console.log("My turn is over");
+            myTurn = false;
+            socket.emit('endTurn', userId);
+        });
+        $("#road").click(function () {
+            buildRoad();
+        });
+        $("#settlement").click(function () {
+            buildSettlement();
+        });
+
+
+        socket.on('initialboard', function (data) {
+            debugger;
+            mapCanvas = document.createElement("canvas");
+            drawingContext = mapCanvas.getContext('2d');
+            mapCanvas.id = "map-canvas";
+            sizeCanvas();
+            document.getElementById("map-container").appendChild(mapCanvas);
+            hexTiles = [];//data;
+            for (var i in data) {
+                hexTiles[i] = new HexTile();
+                hexTiles[i].setNumber(data[i].number);
+                hexTiles[i].setCoordinate.apply(hexTiles[i], [data[i].gridX, data[i].gridY]);
+                hexTiles[i].setResourceType(data[i].resourceType);
+                hexTiles[i].fillStyle = data[i].fillStyle;
+            }
+            boardLoaded();
+        });
+        socket.on('post-turn', function (spots, playerList) {
+            debugger;
+            productiveSpots = spots;
+            players = playerList;
+            for (var i = 0; i < players.length; i++) {
+                if (players[i].num == userId - 1) {
+                    updateResources(players[i]);
+                }
+            }
+            boardLoaded();
+        });
+        boardLoaded = function () {
+
+            loadImages(function () {
+                resizeBoard();
+                //drawingContext.clear();
+                var productionSpots = [];
+                for (var i = 0; i < hexTiles.length; i += 1) {
+                    var spotToCheck = [hexTiles[i].gridX, hexTiles[i].gridY * -1];
+                    if (twoDimArrayContainsArray(productiveSpots, spotToCheck)) {
+                        productionSpots.push(hexTiles[i]);
+                    } else {
+                        hexTiles[i].draw();
+                    }
+                }
+                for (var i = 0; i < productionSpots.length; i += 1) {
+
+                    productionSpots[i].drawProductive();
+
+                }
+                //draw settlements
+                for (var i = 0; i < players.length; i++) {
+                    for (var j = 0; j < players[i].settlements.length; j++) {
+                        drawSettlement(players[i].strokeStyle, players[i].settlements[j]);
+                    }
+                    for (var j = 0; j < players[i].roads.length; j++) {
+                        drawRoad(players[i].strokeStyle, players[i].roads[j]);
+                    }
+                }
+            });
+        }
+
+        resizeBoard = function () {
+            /* Size = Height / ( (coordSpacing + 2) * Math.sin(Math.PI/3) )
+            * Size = Width / ( (coordSpacing * (1 + Math.cos(Math.PI/3)) / 2) + 2 )
+            */
+            var coordSpan = [8, 4];
+
+            var wSize = (mapCanvas.width - 10) /
+                ((coordSpan[0] * (1 + Math.cos(Math.PI / 3)) / 2) + 2);
+            var hSize = (mapCanvas.height - 10) /
+                ((coordSpan[1] + 2) * Math.sin(Math.PI / 3));
+            size = Math.floor(Math.min(wSize, hSize));
+            size *= 0.5;
+            dx = size * (1 + Math.cos(Math.PI / 3)) / 2;
+            dy = size * Math.sin(Math.PI / 3);
+        }
+        drawBoard = function () {
+            debugger;
+            var productionSpots = [];
+            for (var i = 0; i < hexTiles.length; i += 1) {
+                var spotToCheck = [hexTiles[i].gridX, hexTiles[i].gridY * -1];
+                if (twoDimArrayContainsArray(productiveSpots, spotToCheck)) {
+                    productionSpots.push(hexTiles[i]);
+                } else {
+                    hexTiles[i].draw();
+                }
+            }
+            for (var i = 0; i < productionSpots.length; i += 1) {
+
+                productionSpots[i].drawProductive();
+
+            }
+            //draw settlements
+            for (var i = 0; i < players.length; i++) {
+                for (var j = 0; j < players[i].settlements.length; j++) {
+                    drawSettlement(players[i].strokeStyle, players[i].settlements[j]);
+                }
+                for (var j = 0; j < players[i].roads.length; j++) {
+                    drawRoad(players[i].strokeStyle, players[i].roads[j]);
+                }
+            }
+
+        }
+        // function addCanvas() {
+        //$(mapCanvas).attr("width", 600);
+        //$(mapCanvas).attr("height", 400);
+
+        // }
+        HexTile.prototype.strokeStyle = strokeStyle;
+        HexTile.prototype.lineWidth = lineWidth;
+        HexTile.prototype.hexColorMap = resourceTypeToColor;
+        HexTile.prototype.size = size;
+        HexTile.prototype.setResourceType = function (resourceType) {
+            if (this.hexColorMap[resourceType]) {
+                this.resourceType = resourceType;
+                this.fillStyle = this.hexColorMap[resourceType];
+            } else {
+                console.log("Unrecognized resource type:", resourceType);
+            }
+        }
+        HexTile.prototype.isHighlyProductive = function () {
+            return ((this.number == 6) || (this.number == 8));
+        }
+        HexTile.prototype.setNumber = function (number) {
+            this.number = number;
+        }
+        HexTile.prototype.setCoordinate = function (x, y) {
+            this.gridX = x;
+            this.gridY = y;
+        }
+        HexTile.prototype.draw = function (tile) {
+            this.xCenter = canvasCenterX + dx * this.gridX;
+            this.yCenter = canvasCenterY + dy * this.gridY;
+
+            this.drawBase();
+            // Don't draw number if desert
+            if (this.number) {
+                this.drawNumber();
+            }
+        }
+        HexTile.prototype.drawProductive = function (tile) {
+            this.xCenter = canvasCenterX + dx * this.gridX;
+            this.yCenter = canvasCenterY + dy * this.gridY;
+
+            this.drawProductionBase();
+            // Don't draw number if desert
+            if (this.number) {
+                this.drawNumber();
+            }
+        }
+        HexTile.prototype.drawBase = function () {
+
+            if (mapStyle == "retro") {
+                drawingContext.lineWidth = 10;
+                drawingContext.fillStyle = "rgba(255,255,255,0)";
+                drawingContext.strokeStyle = "#FAEB96";
+            } else {
+                drawingContext.lineWidth = this.lineWidth;
+                drawingContext.fillStyle = this.fillStyle;
+                drawingContext.strokeStyle = this.strokeStyle;
+            }
+
+            var angleOffset = Math.PI / 6;
+
+            // Begin Path and start at top of hexagon
+            drawingContext.beginPath();
+            drawingContext.moveTo(
+                this.xCenter + size * Math.sin(angleOffset),
+                this.yCenter - size * Math.cos(angleOffset)
+            );
+            // Move clockwise and draw hexagon
+            var newAngle;
+            for (var i = 1; i <= 6; i += 1) {
+                newAngle = i * Math.PI / 3;
+                drawingContext.lineTo(
+                    this.xCenter + size * Math.sin(newAngle + angleOffset),
+                    this.yCenter - size * Math.cos(newAngle + angleOffset)
+                );
+            }
+            drawingContext.closePath();
+
+            if (mapStyle == "retro") {
+
+                var imgCanvas = resourceTypeToImageCanvas[this.resourceType];
+
+                drawingContext.drawImage(
+                    imgCanvas,
+                    0, 0, imgCanvas.width, imgCanvas.height,
+                    this.xCenter - size,
+                    this.yCenter - dy,
+                    2 * size,
+                    2 * dy
+                );
+
+            } else {
+                drawingContext.fill();
+            }
+
+            drawingContext.stroke();
+
+        }
+        HexTile.prototype.drawNumber = function () {
+
+            drawingContext.fillStyle = "#FFFFFF";
+            drawingContext.strokeStyle = "#000000";
+            drawingContext.lineWidth = 3;
+
+            drawingContext.beginPath();
+            drawingContext.arc(this.xCenter, this.yCenter, 0.375 * size,
+                0, 2 * Math.PI, false);
+            drawingContext.closePath();
+
+            drawingContext.fill();
+            drawingContext.stroke();
+
+            var fontSizePt = Math.ceil(30 / 40 * (.45 * size - 8) + 6);
+
+            drawingContext.font = "bold " + fontSizePt + "pt sans-serif";
+            drawingContext.textAlign = "center";
+            if (this.isHighlyProductive()) {
+                drawingContext.fillStyle = "#FF0000";
+            } else {
+                drawingContext.fillStyle = "#000000";
+            }
+            drawingContext.fillText(
+                this.number.toString(),
+                this.xCenter,
+                this.yCenter + Math.ceil(0.85 * fontSizePt / 2)
+            );
+
+        }
+        function twoDimArrayContainsArray(arr, x) {
+            for (var i = 0; i < arr.length; i++) {
+                if (arr[i][0] == x[0] && arr[i][1] == x[1]) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+
+
+        function preloadImages(arr, callback) {
+            //http://www.javascriptkit.com/javatutors/preloadimagesplus.shtml
+
+            var newimages = [], loadedimages = 0;
+            var postaction = function () { };
+            var arr = (typeof arr != "object") ? [arr] : arr;
+            function imageloadpost() {
+                loadedimages++;
+                if (loadedimages == arr.length) {
+                    callback(newimages); //call postaction and pass in newimages array as parameter
+                }
+            }
+            for (var i = 0; i < arr.length; i++) {
+                newimages[i] = new Image();
+                newimages[i].src = arr[i];
+                newimages[i].onload = function () {
+                    imageloadpost();
+                }
+                newimages[i].onerror = function () {
+                    imageloadpost();
+                }
+            }
+
+        }
+
+        function loadImages(callback) {
+
+            var rTypes = [];
+            var imgPaths = [];
+            for (var key in resourceTypeToImageCanvas) {
+                rTypes.push(key);
+                imgPaths.push("images/" + key + ".png");
+            }
+
+            preloadImages(imgPaths, function (images) {
+
+                for (var i = 0; i < imgPaths.length; i += 1) {
+                    //resourceTypeToImage[ rTypes[i] ] = images[i];
+                    var img = images[i];
+                    var imgCanvas = document.createElement("canvas");
+                    var imgContext = imgCanvas.getContext("2d");
+
+                    imgCanvas.width = img.width;
+                    imgCanvas.height = img.height;
+                    imgContext.drawImage(img, 0, 0);
+
+                    resourceTypeToImageCanvas[rTypes[i]] = imgCanvas;
+                }
+
+                callback();
+
+            });
+
+        }
+
+        function drawSettlement(strokeStyle, settlement) {
+            debugger;
+            drawingContext.fillStyle = strokeStyle;
+            drawingContext.strokeStyle = strokeStyle;
+            drawingContext.lineWidth = 3;
+
+            var centerX = canvasCenterX + dx * settlement.gridX;
+            var centerY = canvasCenterY + dy * settlement.gridY;
+            var offset = 0.25 * size;
+            console.log(size);
+            var startX = centerX - offset;
+            var startY = centerY - offset;
+            var endX = centerX + offset;
+            var endY = centerY + offset;
+
+            drawingContext.fillRect(canvasCenterX + dx * settlement.gridX - offset,
+                canvasCenterY + dy * settlement.gridY - offset,
+                2 * offset,
+                2 * offset);
+            console.log("x: " + endX);
+            console.log("y: " + endY);
+
+            // drawingContext.beginPath();
+            // drawingContext.arc(
+            //     canvasCenterX + dx * settlement.gridX, //center x
+            //     canvasCenterY + dy * settlement.gridY, //center y
+            //     0.375 * size,//radius
+            //     0, 
+            //     2 * Math.PI, false);
+            // drawingContext.closePath();
+
+            // drawingContext.fill();
+            // drawingContext.stroke();
+
+
+        }
+        function drawRoad(strokeStyle, road) {
+            drawingContext.fillStyle = strokeStyle;
+            drawingContext.strokeStyle = strokeStyle;
+            drawingContext.lineWidth = 3;
+
+            var centerX = canvasCenterX + dx * road.gridX;
+            var centerY = canvasCenterY + dy * road.gridY;
+            var offset = 0.25 * size;
+            console.log(size);
+            var startX = centerX - offset;
+            var startY = centerY - offset;
+            var endX = centerX + offset;
+            var endY = centerY + offset;
+
+            drawingContext.fillRect(canvasCenterX + dx * road.gridX - offset,
+                canvasCenterY + dy * road.gridY - offset,
+                3 * offset,
+                offset);
+        }
+
+
+        function updateResources(player) {
+            $("#ore-count").text(player.resources.ore);
+            $("#wood-count").text(player.resources.wood);
+            $("#wool-count").text(player.resources.wool);
+            $("#clay-count").text(player.resources.clay);
+            $("#grain-count").text(player.resources.grain);
+            if (player.resources.wood > 0 && player.resources.clay > 0) {
+                $("#road").show();
+                if (player.resources.grain > 0 && player.resources.wool > 0) {
+                    $("#settlement").show();
+                } else {
+                    $("#settlement").hide();
+                }
+            }
+            else {
+                $("#road").hide();
+                $("#settlement").hide();
+            }
+        }
+
+
+
+
+
+
+
+
+        HexTile.prototype.drawProductionBase = function () {
+
+            if (mapStyle == "retro") {
+                drawingContext.lineWidth = 10;
+                drawingContext.fillStyle = "rgba(255,255,255,0)";
+                drawingContext.strokeStyle = "##ffff00";
+            } else {
+                drawingContext.lineWidth = this.lineWidth;
+                drawingContext.fillStyle = this.fillStyle;
+                drawingContext.strokeStyle = this.strokeStyle;
+            }
+
+            var angleOffset = Math.PI / 6;
+
+            // Begin Path and start at top of hexagon
+            drawingContext.beginPath();
+            drawingContext.moveTo(
+                this.xCenter + size * Math.sin(angleOffset),
+                this.yCenter - size * Math.cos(angleOffset)
+            );
+            // Move clockwise and draw hexagon
+            var newAngle;
+            for (var i = 1; i <= 6; i += 1) {
+                newAngle = i * Math.PI / 3;
+                drawingContext.lineTo(
+                    this.xCenter + size * Math.sin(newAngle + angleOffset),
+                    this.yCenter - size * Math.cos(newAngle + angleOffset)
+                );
+            }
+            drawingContext.closePath();
+
+            if (mapStyle == "retro") {
+
+                var imgCanvas = resourceTypeToImageCanvas[this.resourceType];
+
+                drawingContext.drawImage(
+                    imgCanvas,
+                    0, 0, imgCanvas.width, imgCanvas.height,
+                    this.xCenter - size,
+                    this.yCenter - dy,
+                    2 * size,
+                    2 * dy
+                );
+
+            } else {
+                drawingContext.fill();
+            }
+
+            drawingContext.stroke();
+
+        }
+
+        function buildRoad() {
+            $("#memo").text("Click a spot to build your road");
+            $("#map-canvas").one('click', function (e) {
+                var posX = $(this).offset().left,
+                    posY = $(this).offset().top;
+                //console.log((e.pageX - posX) + ' , ' + (e.pageY - posY));
+                var x = (((e.pageX - posX) - canvasCenterX) / dx);
+                var y = (-1 * ((e.pageY - posY) - canvasCenterY) / dy);
+                //console.log(x + ' , ' + y);
+                y = Math.round(y / 0.5) * 0.5;
+                x = Math.round(x);
+                console.log(x + ' , ' + y);
+                $.get(baseUrl + '/api/buildRoad?playerId=' + userId + '&x=' + x + '&y=' + y, function (data) {
+                    console.log("road registered")
+                });
+                $("#memo").text("Catan");
+                //drawRoad(userColor, {gridX: x, gridY: -1 * y});
+
+                //canvasCenterX + dx * road.gridX
+            });
+        }
+
+        function buildSettlement() {
+            $("#memo").text("Click a spot to build your settlement");
+            $("#map-canvas").one('click', function (e) {
+                var posX = $(this).offset().left,
+                    posY = $(this).offset().top;
+                //console.log((e.pageX - posX) + ' , ' + (e.pageY - posY));
+                var x = (((e.pageX - posX) - canvasCenterX) / dx);
+                var y = (-1 * ((e.pageY - posY) - canvasCenterY) / dy);
+                //console.log(x + ' , ' + y);
+                y = Math.round(y / 0.5) * 0.5;
+                x = Math.round(x);
+                console.log(x + ' , ' + y);
+                $.get(baseUrl + '/api/buildSettlement?playerId=' + userId + '&x=' + x + '&y=' + y, function (data) {
+                    console.log("settlement registered")
+                });
+                $("#memo").text("Catan");
+                //drawRoad(userColor, {gridX: x, gridY: -1 * y});
+
+                //canvasCenterX + dx * road.gridX
+            });
+        }
+        });
+</script>
+
+<!-- <input type="text" id="text" />
+<button id="send">send</button> -->
+<div style="width: 25%; float: left; outline: 1px solid black;">
+    <h3 id="title" style="background-color: black;"></h3>
+    <button id="end-turn">end turn</button>
+    <br>
+    <button id="settlement">settlement</button>
+    <button id="road">road</button>
+    <label>roll:</label><span id="dice-roll"></span>
+    <br>
+    <br>
+    <label>rock:</label><span id="ore-count"></span><br>
+    <label>wood:</label><span id="wood-count"></span><br>
+    <label>sheep:</label><span id="wool-count"></span><br>
+    <label>wheat:</label><span id="grain-count"></span><br>
+    <label>brick:</label><span id="clay-count"></span><br>
+</div>
+<div style="width: 75%; float: right;">
+    <div id="memo" align="center">Catan</div>
+    <div id="map-container"></div>
+</div>
