@@ -379,24 +379,31 @@ io.on('connection', function (socket) {
 	});
 	app.get('/api/buildRoad', function(req, res){
 		console.log(req.query);
-		players[req.query.playerId - 1].roads.push({
-			gridX: req.query.x,
-			gridY: req.query.y * -1
-		});
-		players[req.query.playerId - 1].resources.wood--;
-		players[req.query.playerId - 1].resources.clay--;
-		io.emit("post-turn", productiveSpots, players);
+		if(isRoadSpace(req.query.x, req.query.y)){
+			players[req.query.playerId - 1].roads.push({
+				gridX: req.query.x,
+				gridY: req.query.y * -1
+			});
+			players[req.query.playerId - 1].resources.wood--;
+			players[req.query.playerId - 1].resources.clay--;
+			io.emit("post-turn", productiveSpots, players);
+		}
+		else {
+			io.emit("post-turn", productiveSpots, players);
+		}
 	  });
 	app.get('/api/buildSettlement', function(req, res){
 		console.log(req.query);
-		players[req.query.playerId - 1].settlements.push({
-			gridX: req.query.x,
-			gridY: req.query.y * -1
-		});
-		players[req.query.playerId - 1].resources.wood--;
-		players[req.query.playerId - 1].resources.clay--;
-		players[req.query.playerId - 1].resources.wool--;
-		players[req.query.playerId - 1].resources.grain--;
+		if (isSettlementSpace(req.query.x, req.query.y)){
+			players[req.query.playerId - 1].settlements.push({
+				gridX: req.query.x,
+				gridY: req.query.y * -1
+			});
+			players[req.query.playerId - 1].resources.wood--;
+			players[req.query.playerId - 1].resources.clay--;
+			players[req.query.playerId - 1].resources.wool--;
+			players[req.query.playerId - 1].resources.grain--;
+		}
 		io.emit("post-turn", productiveSpots, players);
 	  });
 	//var oi = io.listen(server);
@@ -846,6 +853,15 @@ function loadImages(callback) {
 	});
 
 }
+
+function isRoadSpace(x, y){
+	return true;
+}
+function isSettlementSpace(x, y){
+	spaceString = "[" + x + ", " + y + "]";
+	return spaceString in productiveSpots;
+}
+
 
 function MapDefinition() {
 	this.resourceDict = null;
