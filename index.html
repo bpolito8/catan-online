@@ -165,7 +165,7 @@ body, html, canvas {
     // });
 
     $(document).ready(function () {
-
+        
         $("#send").click(function () {
             socket.emit('message', { text: $("#text").val() });
         });
