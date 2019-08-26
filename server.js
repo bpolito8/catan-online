@@ -362,7 +362,7 @@ var startGame = function(){
 
 
 	};
-	minSessions = 3;
+	minSessions = 1;
 	gameRunning = false;
 
 	
