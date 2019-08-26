@@ -182,7 +182,7 @@ app.get('/images/grain.png', function (req, res) {
 	res.sendFile(__dirname + '/images/grain.png');
 });
 app.get('/images/ore.png', function (req, res) {
-	res.sendFile(__dirname + '/images/wood.png');
+	res.sendFile(__dirname + '/images/ore.png');
 });
 app.get('/images/wood.png', function (req, res) {
 	res.sendFile(__dirname + '/images/wood.png');
