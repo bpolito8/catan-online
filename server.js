@@ -172,7 +172,9 @@ var spotToUserDict = {
 app.get('/', function (req, res) {
 	res.sendFile(__dirname + '/index.html');
 });
-
+app.get('/images/clay.png', function (req, res) {
+	res.sendFile(__dirname + '/images/clay.png');
+});
 
 app.get('/test', function (req, res) {
 	res.send("hello world");
