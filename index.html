@@ -2,7 +2,62 @@
 <script src="https://code.jquery.com/jquery-3.4.0.min.js" integrity="sha256-BJeo0qm959uMBGb65z40ejJYGSgR7REI4+CW1fNKwOg="
     crossorigin="anonymous"></script>
 <script src="catan.js"></script>
-<link rel="stylesheet" href="css/stylesheet.css">
+<!--<link rel="stylesheet" href="css/stylesheet.css">-->
+<style>
+#content-wrapper {
+   width:100%;
+   height:100%;
+   margin:0 auto;
+   position:relative;
+}
+#content-left {
+    /*position:absolute;
+    top:0;
+    left:0;
+    width:300px;*/
+    text-align:center;
+    float:left;
+    width:300px;
+}
+#content-right {
+    /*position:absolute;
+    top:0;
+    left:300px;*/
+    margin-left:300px;
+    height:100%;
+}
+#map-container {
+	width:100%;
+	height:100%;
+}
+button#gen-map-button {
+	width:150px;
+}
+#gen-options {
+	padding: 20px 0px;
+}
+canvas#map-canvas {
+	width:100%;
+	height:100%;
+}
+/*
+h1#title {
+	text-align:center;
+}
+*/
+/*canvas#maincanvas{
+	position: absolute;
+}
+*/
+body, html, canvas {
+	margin: 0;
+	padding: 0;
+	width: 100%;
+	height: 100%;
+}
+
+
+</style>
 <script>
     //var baseUrl = 'http://localhost:8000';
     //var baseUrl = 'https://catan-online-1.herokuapp.com';
