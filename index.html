@@ -165,7 +165,7 @@ body, html, canvas {
     // });
 
     $(document).ready(function () {
-        
+
         $("#send").click(function () {
             socket.emit('message', { text: $("#text").val() });
         });
@@ -628,7 +628,7 @@ body, html, canvas {
                 y = Math.round(y / 0.5) * 0.5;
                 x = Math.round(x);
                 console.log(x + ' , ' + y);
-                $.get(baseUrl + '/api/buildRoad?playerId=' + userId + '&x=' + x + '&y=' + y, function (data) {
+                $.get(baseUrl + 'api/buildRoad?playerId=' + userId + '&x=' + x + '&y=' + y, function (data) {
                     console.log("road registered")
                 });
                 $("#memo").text("Catan");
@@ -650,7 +650,7 @@ body, html, canvas {
                 y = Math.round(y / 0.5) * 0.5;
                 x = Math.round(x);
                 console.log(x + ' , ' + y);
-                $.get(baseUrl + '/api/buildSettlement?playerId=' + userId + '&x=' + x + '&y=' + y, function (data) {
+                $.get(baseUrl + 'api/buildSettlement?playerId=' + userId + '&x=' + x + '&y=' + y, function (data) {
                     console.log("settlement registered")
                 });
                 $("#memo").text("Catan");
