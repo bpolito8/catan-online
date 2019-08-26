@@ -175,6 +175,23 @@ app.get('/', function (req, res) {
 app.get('/images/clay.png', function (req, res) {
 	res.sendFile(__dirname + '/images/clay.png');
 });
+app.get('/images/desert.png', function (req, res) {
+	res.sendFile(__dirname + '/images/desert.png');
+});
+app.get('/images/grain.png', function (req, res) {
+	res.sendFile(__dirname + '/images/grain.png');
+});
+app.get('/images/ore.png', function (req, res) {
+	res.sendFile(__dirname + '/images/wood.png');
+});
+app.get('/images/wood.png', function (req, res) {
+	res.sendFile(__dirname + '/images/wood.png');
+});
+app.get('/images/wool.png', function (req, res) {
+	res.sendFile(__dirname + '/images/wool.png');
+});
+
+
 
 app.get('/test', function (req, res) {
 	res.send("hello world");
