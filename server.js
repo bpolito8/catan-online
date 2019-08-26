@@ -199,21 +199,23 @@ app.get('/test', function (req, res) {
 app.get('/api/restartGame', function (req, res) {
 	console.log("restarting...")
 	startGame()
+
 	console.log("restarted")
+	res.send("success")
 });
 
 var startGame = function(){
-	var players = [];
-	var sockets = [];
-	var productiveSpots = []
-	var hexTiles = {};
-	var colors = [
+	players = [];
+	sockets = [];
+	productiveSpots = []
+	hexTiles = {};
+	colors = [
 		"#3333ff",
 		"#ffffff",
 		"#339933",
 		"#cc3300"
 	]
-	var spots = [
+	spots = [
 		[0, 1],
 		[1, 1],
 		[2, 1],
@@ -290,7 +292,7 @@ var startGame = function(){
 		[-3, 5]
 	]
 
-	var spotToUserDict = {
+	spotToUserDict = {
 		'[1, 0]': 0,
 		'[1, 1]': null,
 		'[1, 2]': null,
@@ -360,8 +362,8 @@ var startGame = function(){
 
 
 	};
-	var minSessions = 2;
-	var gameRunning = false;
+	minSessions = 2;
+	gameRunning = false;
 
 	io.on('connection', function (socket) {
 		socket.emit('serverMessage', "connection successful");
