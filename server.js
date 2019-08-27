@@ -99,7 +99,7 @@ var spots = [
 ]
 
 var spotToUserDict = {
-	'[1, 0]': 0,
+	'[1, 0]': null,
 	'[1, 1]': null,
 	'[1, 2]': null,
 	'[1, 3]': null,
@@ -117,7 +117,7 @@ var spotToUserDict = {
 	'[5, 2]': null,
 	'[5, 3]': null,
 		
-	'[-1, 0]': 0,
+	'[-1, 0]': null,
 	'[-1, 1]': null,
 	'[-1, 2]': null,
 	'[-1, 3]': null,
@@ -125,7 +125,7 @@ var spotToUserDict = {
 	'[-1, 5]': null,
 		
 	'[-3, 0]': null,
-	'[-3, 1]': 1,
+	'[-3, 1]': null,
 	'[-3, 2]': null,
 	'[-3, 3]': null,
 	'[-3, 4]': null,
@@ -157,14 +157,14 @@ var spotToUserDict = {
 	'[1, -4]': null,
 	'[1, -5]': null,
 
-	'[3, -1]': 1,
+	'[3, -1]': null,
 	'[3, -2]': null,
 	'[3, -3]': null,
 	'[3, -4]': null,
 		
 	'[5, -1]': null,
 	'[5, -2]': null,
-'[5, -3]': null,
+	'[5, -3]': null,
 
 
 };
@@ -293,7 +293,7 @@ var startGame = function(){
 	]
 
 	spotToUserDict = {
-		'[1, 0]': 0,
+		'[1, 0]': null,
 		'[1, 1]': null,
 		'[1, 2]': null,
 		'[1, 3]': null,
@@ -311,7 +311,7 @@ var startGame = function(){
 		'[5, 2]': null,
 		'[5, 3]': null,
 			
-		'[-1, 0]': 0,
+		'[-1, 0]': null,
 		'[-1, 1]': null,
 		'[-1, 2]': null,
 		'[-1, 3]': null,
@@ -319,7 +319,7 @@ var startGame = function(){
 		'[-1, 5]': null,
 			
 		'[-3, 0]': null,
-		'[-3, 1]': 1,
+		'[-3, 1]': null,
 		'[-3, 2]': null,
 		'[-3, 3]': null,
 		'[-3, 4]': null,
@@ -362,7 +362,7 @@ var startGame = function(){
 
 
 	};
-	minSessions = 1;
+	minSessions = 2;
 	gameRunning = false;
 
 	
@@ -395,14 +395,22 @@ io.on('connection', function (socket) {
 	app.get('/api/buildSettlement', function(req, res){
 		console.log(req.query);
 		if (isSettlementSpace(req.query.x, req.query.y)){
+			var x = req.query.x;
+			var y = req.query.y * -1
 			players[req.query.playerId - 1].settlements.push({
 				gridX: req.query.x,
 				gridY: req.query.y * -1
 			});
+
+			spotToUserDict["[" + x + ", " + y + "]"] = req.query.playerId - 1;
+
 			players[req.query.playerId - 1].resources.wood--;
 			players[req.query.playerId - 1].resources.clay--;
 			players[req.query.playerId - 1].resources.wool--;
 			players[req.query.playerId - 1].resources.grain--;
+			if(players[req.query.playerId - 1].settlements.length <= 2){
+				distributeResources(x, y, req.query.playerId - 1)
+			}
 		}
 		io.emit("post-turn", productiveSpots, players);
 	  });
@@ -412,24 +420,8 @@ io.on('connection', function (socket) {
 	players.push({
 		num: players.length,
 		settlements: [
-			{
-				gridY: players.length,
-				gridX: 1 + (2 * players.length)
-			},
-			{
-				gridY: -1 * players.length,
-				gridX: -1 - (2 * players.length)
-			}
 		],
 		roads: [
-			{
-				gridY: players.length + 0.5,
-				gridX: 1 + (2 * players.length)
-			},
-			{
-				gridY: -1 * players.length + 0.5,
-				gridX: -1 - (2 * players.length)
-			}
 		],
 		devCards: {
 			used: [],
@@ -437,10 +429,10 @@ io.on('connection', function (socket) {
 		},
 		resources: {
 			ore: 0,
-			clay: 1,
-			wool: 0,
-			wood: 1,
-			grain: 0,
+			clay: 100,
+			wool: 100,
+			wood: 100,
+			grain: 100,
 
 		},
 		strokeStyle: colors[players.length]
@@ -540,28 +532,8 @@ function runTurn(player) {
 				productiveSpots.push([x, y]);
 				console.log("There is an " + diceRoll + " at [" + x + ", " + y + "]");
 				//check all six possible spots in relation to this tile
-				var spotsToCheck = [
-					[x + xOffset, y + yOffset],
-					[x + xOffset, y],
-					[x + xOffset, y - yOffset],
-					[x - xOffset, y - yOffset],
-					[x - xOffset, y + yOffset],
-					[x - xOffset, y],
-				];
-				//console.log(spotsToCheck);
-
-				var keys = [];
-				for(var h = 0; h < spotsToCheck.length; h++){
-					keys.push("[" + spotsToCheck[h][0] + ", " + spotsToCheck[h][1] + "]");
-				}
 				
-				console.log(keys);
-				for (j in keys) {
-					var player = players[spotToUserDict[keys[j]]];
-					if(player){
-						player.resources[hexTiles[i].resourceType]++;
-					}
-				}
+				distributeResources(x, y, -1)
 				// players[spotToUserDict["[" + hexTiles.gridX + ", " + hexTiles.gridY + yOffset + "]"]][hexTiles.resourceType]++;
 				// players[spotToUserDict["[" + hexTiles.gridX +  xOffset+ ", " + hexTiles.gridY + yOffset + "]"]][hexTiles.resourceType]++;
 				// players[spotToUserDict["[" + hexTiles.gridX + xOffset+ ", " + hexTiles.gridY - yOffset + "]"]][hexTiles.resourceType]++;
@@ -588,6 +560,33 @@ function addSettlement(player, x, y){
 	});
 }
 
+function distributeResources(x, y, playerNum){
+	var xOffset = 1;
+	var yOffset = 1;
+
+	var spotsToCheck = [
+		[x + xOffset, y + yOffset],
+		[x + xOffset, y],
+		[x + xOffset, y - yOffset],
+		[x - xOffset, y - yOffset],
+		[x - xOffset, y + yOffset],
+		[x - xOffset, y],
+	];
+	//console.log(spotsToCheck);
+
+	var keys = [];
+	for(var h = 0; h < spotsToCheck.length; h++){
+		keys.push("[" + spotsToCheck[h][0] + ", " + spotsToCheck[h][1] + "]");
+	}
+	
+	console.log(keys);
+	for (j in keys) {
+		var player = players[spotToUserDict[keys[j]]];
+		if(player && (playerNum == -1 || player == playerNum)){
+			player.resources[hexTiles[j].resourceType]++;
+		}
+	}
+}
 
 
 /*
@@ -858,8 +857,12 @@ function isRoadSpace(x, y){
 	return true;
 }
 function isSettlementSpace(x, y){
-	spaceString = "[" + x + ", " + y + "]";
-	return spaceString in productiveSpots;
+	// spaceString = '[' + x + ', ' + y + ']';
+	// console.log(spaceString)
+	// console.log(productiveSpots[spaceString])
+	// console.log(spaceString in productiveSpots)
+	// return spaceString in productiveSpots;
+	return true;
 }
 
 

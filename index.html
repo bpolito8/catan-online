@@ -59,7 +59,7 @@ body, html, canvas {
 
 </style>
 <script>
-    //var baseUrl = 'http://localhost:8000';
+    //var baseUrl = 'http://localhost:8000/';
     //var baseUrl = 'https://catan-online-1.herokuapp.com';
     var baseUrl = window.location.href;
     var mapStyle = "retro";
@@ -234,11 +234,12 @@ body, html, canvas {
                 }
                 //draw settlements
                 for (var i = 0; i < players.length; i++) {
-                    for (var j = 0; j < players[i].settlements.length; j++) {
-                        drawSettlement(players[i].strokeStyle, players[i].settlements[j]);
-                    }
+                    
                     for (var j = 0; j < players[i].roads.length; j++) {
                         drawRoad(players[i].strokeStyle, players[i].roads[j]);
+                    }
+                    for (var j = 0; j < players[i].settlements.length; j++) {
+                        drawSettlement(players[i].strokeStyle, players[i].settlements[j]);
                     }
                 }
             });
@@ -277,11 +278,12 @@ body, html, canvas {
             }
             //draw settlements
             for (var i = 0; i < players.length; i++) {
-                for (var j = 0; j < players[i].settlements.length; j++) {
-                    drawSettlement(players[i].strokeStyle, players[i].settlements[j]);
-                }
+
                 for (var j = 0; j < players[i].roads.length; j++) {
                     drawRoad(players[i].strokeStyle, players[i].roads[j]);
+                }
+                for (var j = 0; j < players[i].settlements.length; j++) {
+                    drawSettlement(players[i].strokeStyle, players[i].settlements[j]);
                 }
             }
 
@@ -394,7 +396,7 @@ body, html, canvas {
             drawingContext.arc(this.xCenter, this.yCenter, 0.375 * size,
                 0, 2 * Math.PI, false);
             drawingContext.closePath();
-
+            
             drawingContext.fill();
             drawingContext.stroke();
 
@@ -486,19 +488,95 @@ body, html, canvas {
             drawingContext.strokeStyle = strokeStyle;
             drawingContext.lineWidth = 3;
 
-            var centerX = canvasCenterX + dx * settlement.gridX;
+
+
+
+            x = settlement.gridX
+            y = settlement.gridY * 2
+            adjustment = 0
+            if(x % 2 == 0){
+                angle = 0;
+            }
+            else if (x > 0){
+                console.log("x positive");
+                if ((x / 2) % 2  <= 0.5 && (x / 2) % 2  >= -0.5){
+                    console.log("x even");
+                    if ((y / 2) % 2 <= 0.5 && (y / 2) % 2 >= -0.5){
+                        console.log("y even");
+                        adjustment = 10
+                    }
+                    else {
+                        console.log("y odd");
+                        adjustment = -10
+                    }
+                }
+                else {
+                    if ((y / 2) % 2 <= 0.5 && (y / 2) % 2 >= -0.5){
+                        adjustment = -10
+                    }
+                    else {
+                        adjustment = 10
+                    }
+                }
+            }
+            else {
+                console.log("x / 2 %2 is " + (x / 2) % 2)
+                if ((x / 2) % 2  <= 0.5 && (x / 2) % 2  >= -0.5){
+                    console.log("x / 2 is even");
+                    
+                    if ((y / 2) % 2 <= 0.5 && (y / 2) % 2 >= -0.5){
+
+                        adjustment = -10
+                    }
+                    else {
+                        adjustment = 10
+                    }
+                }
+                else {
+                    console.log("x is odd");
+                    console.log("y / 2 is " + (y) % 2);
+                    if ((y / 2) % 2 <= 0.5 && (y / 2) % 2 >= -0.5){
+                        console.log("y / 2 is even");
+                        adjustment = 10
+                    }
+                    else {
+                        console.log("y / 2 is odd");
+                        adjustment = -10
+                    }
+                }
+            }
+
+            var centerX = canvasCenterX + dx * settlement.gridX + adjustment;
             var centerY = canvasCenterY + dy * settlement.gridY;
-            var offset = 0.25 * size;
+            var offset = 0.15 * size;
             console.log(size);
+
+
+
+
             var startX = centerX - offset;
             var startY = centerY - offset;
             var endX = centerX + offset;
             var endY = centerY + offset;
+            var peakY = centerY - (2 * offset)
 
-            drawingContext.fillRect(canvasCenterX + dx * settlement.gridX - offset,
-                canvasCenterY + dy * settlement.gridY - offset,
-                2 * offset,
-                2 * offset);
+            //drawingContext.lineWidth = 10;
+
+            drawingContext.beginPath()
+            drawingContext.moveTo(startX, startY)//top left
+            drawingContext.lineTo(startX, endY)//bottom left
+            drawingContext.lineTo(endX, endY)
+            drawingContext.lineTo(endX, startY)
+            drawingContext.lineTo(centerX, peakY)
+            drawingContext.closePath()
+            drawingContext.strokeStyle = '#000000';
+            drawingContext.stroke();
+
+            drawingContext.fill()
+            // drawingContext.fillRect(canvasCenterX + dx * settlement.gridX - offset,
+            //     canvasCenterY + dy * settlement.gridY - offset,
+            //     2 * offset,
+            //     2 * offset);
             console.log("x: " + endX);
             console.log("y: " + endY);
 
@@ -523,17 +601,103 @@ body, html, canvas {
 
             var centerX = canvasCenterX + dx * road.gridX;
             var centerY = canvasCenterY + dy * road.gridY;
-            var offset = 0.25 * size;
+            var offset = 0.15 * size;
             console.log(size);
             var startX = centerX - offset;
             var startY = centerY - offset;
             var endX = centerX + offset;
             var endY = centerY + offset;
 
-            drawingContext.fillRect(canvasCenterX + dx * road.gridX - offset,
-                canvasCenterY + dy * road.gridY - offset,
-                3 * offset,
-                offset);
+            drawingContext.save();
+            drawingContext.translate(centerX, centerY);
+
+            angle = 0
+            if(road.gridX % 2 != 0){
+                angle = 60
+                x = road.gridX
+                y = road.gridY / 0.5
+                
+                
+            }
+            x = road.gridX
+            y = road.gridY * 2
+            if(x % 2 == 0){
+                angle = 0;
+            }
+            else if (x > 0){
+                console.log("x positive");
+                if ((x / 2) % 2  <= 0.5 && (x / 2) % 2  >= -0.5){
+                    console.log("x even");
+                    if ((y / 2) % 2 <= 0.5 && (y / 2) % 2 >= -0.5){
+                        console.log("y even");
+                        angle = -60
+                    }
+                    else {
+                        console.log("y odd");
+                        angle = 60
+                    }
+                }
+                else {
+                    if ((y / 2) % 2 <= 0.5 && (y / 2) % 2 >= -0.5){
+                        angle = 60
+                    }
+                    else {
+                        angle = -60
+                    }
+                }
+            }
+            else {
+                console.log("x / 2 %2 is " + (x / 2) % 2)
+                if ((x / 2) % 2  <= 0.5 && (x / 2) % 2  >= -0.5){
+                    console.log("x / 2 is even");
+                    
+                    if ((y / 2) % 2 <= 0.5 && (y / 2) % 2 >= -0.5){
+
+                        angle = 60
+                    }
+                    else {
+                        angle = -60
+                    }
+                }
+                else {
+                    console.log("x is odd");
+                    console.log("y / 2 is " + (y) % 2);
+                    if ((y / 2) % 2 <= 0.5 && (y / 2) % 2 >= -0.5){
+                        console.log("y / 2 is even");
+                        angle = -60
+                    }
+                    else {
+                        console.log("y / 2 is odd");
+                        angle = 60
+                    }
+                }
+            }
+            if (y > 0){
+                angle = angle * -1;
+            }
+            console.log("angle = " + angle)
+
+
+            drawingContext.rotate(-1 * angle * Math.PI/180);
+            // drawingContext.fillRect(centerX - offset,
+            //     centerY - offset,
+            //     3 * offset,
+            //     offset);
+            //drawingContext.rect(-offset/2, -offset/2, 3 * offset, offset);
+           // oldFillStyle = drawingContext.fillStyle
+            //drawingContext.fillStyle = strokeStyle;
+           // drawingContext.stroke()
+           drawingContext.fillStyle = "#000000";
+        //drawingContext.strokeStyle = strokeStyle;
+           drawingContext.fillRect(-3.6 * offset/2, -1.2 * offset/2, 3.6 * offset, 1.2 * offset);
+
+           drawingContext.fillStyle = strokeStyle;
+            drawingContext.strokeStyle = strokeStyle;
+           drawingContext.fillRect(-3.3 * offset/2, -offset/2, 3.3 * offset, offset);
+
+            drawingContext.rotate(-1 * angle * Math.PI/180);
+            drawingContext.restore();
+            //drawingContext.fillStyle = oldFillStyle
         }
 
 
